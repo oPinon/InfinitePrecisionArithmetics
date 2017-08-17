@@ -64,7 +64,7 @@ public:
       this->addAt( o.m_values[i], i );
   }
 
-  inline void operator-=( const InfinitePrecisionUInt& o )
+  void operator-=( const InfinitePrecisionUInt& o )
   {
     assert( *this > o );
     for( uint32_t ip = o.m_values.size(); ip > 0; ip-- )
@@ -149,25 +149,96 @@ inline InfinitePrecisionUInt operator+( const InfinitePrecisionUInt& a, const In
 inline InfinitePrecisionUInt operator-( const InfinitePrecisionUInt& a, const InfinitePrecisionUInt& b ) { InfinitePrecisionUInt dst = a; dst -= b; return dst; }
 inline InfinitePrecisionUInt operator*( const InfinitePrecisionUInt& a, const InfinitePrecisionUInt& b ) { InfinitePrecisionUInt dst = a; dst *= b; return dst; }
 
-inline std::ostream& operator<<( std::ostream& s, const InfinitePrecisionUInt& f )
+inline std::ostream& operator<<( std::ostream& s, const InfinitePrecisionUInt& f ) { return f.print( s ); }
+
+struct InfinitePrecisionInt
 {
-  return f.print( s );
-}
+private:
+  bool m_positive;
+  InfinitePrecisionUInt m_digits;
+
+  inline InfinitePrecisionInt inverse() const { InfinitePrecisionInt dst = *this; dst.m_positive = !dst.m_positive; return dst; }
+  inline bool positive() const { return m_positive; }
+  inline bool negative() const { return !m_positive; }
+
+public:
+  InfinitePrecisionInt() : m_positive(true) {}
+
+  InfinitePrecisionInt( int64_t v )
+    : m_positive( v > 0 )
+    , m_digits( std::abs( v ) )
+  {}
+
+  InfinitePrecisionInt( const std::string& s )
+  {
+    if( s[0] == '+' || s[0] == '-' )
+    {
+      this->m_positive = ( s[0] == '+' );
+      this->m_digits = InfinitePrecisionUInt( s.substr( 1 ) );
+    }
+    else
+      this->m_digits = InfinitePrecisionUInt( s );
+  }
+
+  inline void operator+=( const InfinitePrecisionInt& o )
+  {
+    if( this->m_positive == o.m_positive )
+      this->m_digits += o.m_digits;
+    else
+    {
+      if( this->m_digits < o.m_digits )
+      {
+        this->m_positive = o.m_positive;
+        this->m_digits = ( o.m_digits - this->m_digits );
+      }
+      else
+        this->m_digits -= o.m_digits;
+    }
+  }
+
+  inline void operator-=( const InfinitePrecisionInt& o ) { ( *this ) += o.inverse(); }
+
+  inline void operator*=( const InfinitePrecisionInt& o )
+  {
+    this->m_digits *= o.m_digits;
+    this->m_positive = !( this->m_positive ^ o.m_positive );
+  }
+
+  bool operator<( const InfinitePrecisionInt& o ) const
+  {
+    if( this->m_positive != o.m_positive )
+      if( o.m_digits != 0 || this->m_digits != 0 )
+        return this->negative();
+      else
+        return false;
+
+    if( this->m_digits == o.m_digits )
+      return false;
+
+    bool inf = ( this->m_digits < o.m_digits );
+    return this->positive() ? inf : !inf;
+  }
+
+  inline bool operator>( const InfinitePrecisionInt& o ) const { return !( *this < o ) && ( *this != o ); }
+  inline bool operator==( const InfinitePrecisionInt& o ) const { return !( *this < o ) && !( o < *this ); }
+  inline bool operator!=( const InfinitePrecisionInt& o ) const { return !( *this == o ); }
+
+  std::ostream& print( std::ostream& s ) const
+  {
+    s << ( this->positive() ? '+' : '-' );
+    s << this->m_digits;
+    return s;
+  }
+};
+
+inline InfinitePrecisionInt operator+( const InfinitePrecisionInt& a, const InfinitePrecisionInt& b ) { InfinitePrecisionInt dst = a; dst += b; return dst; }
+inline InfinitePrecisionInt operator-( const InfinitePrecisionInt& a, const InfinitePrecisionInt& b ) { InfinitePrecisionInt dst = a; dst -= b; return dst; }
+inline InfinitePrecisionInt operator*( const InfinitePrecisionInt& a, const InfinitePrecisionInt& b ) { InfinitePrecisionInt dst = a; dst *= b; return dst; }
+
+inline std::ostream& operator<<( std::ostream& s, const InfinitePrecisionInt& f ) { return f.print( s ); }
 
 typedef InfinitePrecisionUInt UIntI;
-//typedef double FloatI;
-
-/*
-template<typename T>
-void Test()
-{
-  T a = 3.14;
-  T b = -2.4;
-
-  //assert( ( a - a ) == 0 );
-  //assert( ( a * 2 ) == ( a + a ) );
-}
-*/
+typedef InfinitePrecisionInt IntI;
 
 void Test()
 {
@@ -223,6 +294,16 @@ void Test()
     UIntI b =                          "2";
     UIntI c =  "9999999999999999999999999";
     assert( a - b == c );
+  }
+
+  {
+    IntI a =    "1515351351513153121";
+    IntI b =       "-513158532123513";
+    IntI c =  "853251585321553132125";
+    IntI d =   "+1514838192981029608";
+    IntI e = "-851736233970039979004";
+    assert( a + b == d );
+    assert( a - c == e );
   }
 
   std::cout << "Test passed" << std::endl;
