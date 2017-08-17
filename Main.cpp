@@ -58,6 +58,16 @@ public:
     m_values.push_back( sum );
   }
 
+  inline uint32_t digits() const { return m_values.size() * this->maxDigits(); }
+  inline unsigned short digit( const uint32_t i ) const
+  {
+    const uint32_t subNumber = ( i / this->maxDigits() );
+    if( subNumber >= m_values.size() )
+      return 0;
+    const uint32_t subDigit = ( i % this->maxDigits() );
+    return ( m_values[subNumber] / uint32_t(std::pow( 10, subDigit )) ) % 10;
+  }
+
   inline void operator+=( const InfinitePrecisionUInt& o )
   {
     for( uint32_t i = 0; i < o.m_values.size(); i++ )
@@ -132,9 +142,9 @@ public:
     assert( !m_values.empty() );
     for( auto it = m_values.rbegin(); it != m_values.rend(); it++ )
     {
-      if( it == m_values.rbegin() )
+      /*if( it == m_values.rbegin() )
         s << *it;
-      else
+      else*/
       {
         std::stringstream ss; ss << ( max() + *it );
         s << ss.str().substr( 1 );
@@ -157,10 +167,6 @@ private:
   bool m_positive;
   InfinitePrecisionUInt m_digits;
 
-  inline InfinitePrecisionInt inverse() const { InfinitePrecisionInt dst = *this; dst.m_positive = !dst.m_positive; return dst; }
-  inline bool positive() const { return m_positive; }
-  inline bool negative() const { return !m_positive; }
-
 public:
   InfinitePrecisionInt() : m_positive(true) {}
 
@@ -179,6 +185,10 @@ public:
     else
       this->m_digits = InfinitePrecisionUInt( s );
   }
+
+  inline InfinitePrecisionInt inverse() const { InfinitePrecisionInt dst = *this; dst.m_positive = !dst.m_positive; return dst; }
+  inline bool positive() const { return m_positive; }
+  inline bool negative() const { return !m_positive; }
 
   inline void operator+=( const InfinitePrecisionInt& o )
   {
@@ -237,8 +247,61 @@ inline InfinitePrecisionInt operator*( const InfinitePrecisionInt& a, const Infi
 
 inline std::ostream& operator<<( std::ostream& s, const InfinitePrecisionInt& f ) { return f.print( s ); }
 
+struct InfinitePrecisionFloat
+{
+private:
+  int32_t m_offset;
+  InfinitePrecisionInt m_digits;
+
+  inline double factor() const { return std::pow( 10, m_offset ); }
+
+public:
+  InfinitePrecisionFloat() : m_offset( 0 ) {}
+
+  InfinitePrecisionFloat( double d )
+  {
+    this->m_offset = -( std::log10( std::numeric_limits<uint32_t>::max() ) - 1 );
+    this->m_digits = InfinitePrecisionInt( d / this->factor() );
+  }
+
+  std::ostream& print( std::ostream& s ) const
+  {
+    std::stringstream ss;
+    ss << m_digits;
+    std::string str = ss.str();
+    uint32_t digits = str.size();
+    bool signChar = ( str.size() > 0 && ( str[0] == '+' || str[0] == '-' ) );
+    if( signChar )
+    {
+      s << str[0];
+      digits--;
+      str = str.substr( 1 );
+    }
+    if( digits < -m_offset )
+    {
+      s << "0.";
+      for( int32_t i = digits; i < -m_offset; i++ )
+        s << '0';
+      s << str;
+    }
+    else
+    if( m_offset < 0 )
+    {
+      s << str.substr( 0, digits + m_offset );
+      s << '.';
+      s << str.substr( digits + m_offset );
+    }
+    else
+      s << str;
+    return s;
+  }
+};
+
+inline std::ostream& operator<<( std::ostream& s, const InfinitePrecisionFloat& f ) { return f.print( s ); }
+
 typedef InfinitePrecisionUInt UIntI;
 typedef InfinitePrecisionInt IntI;
+typedef InfinitePrecisionFloat FloatI;
 
 void Test()
 {
@@ -304,6 +367,19 @@ void Test()
     IntI e = "-851736233970039979004";
     assert( a + b == d );
     assert( a - c == e );
+    assert( b < a );
+    assert( a > b );
+    assert( e < d );
+    assert( e < b );
+  }
+
+  {
+    FloatI a = 0.01416;
+    std::cout << a << std::endl;
+    FloatI b = 3.1416;
+    std::cout << b << std::endl;
+    FloatI c = 0.1416;
+    std::cout << c << std::endl;
   }
 
   std::cout << "Test passed" << std::endl;
