@@ -64,7 +64,39 @@ public:
       this->addAt( o.m_values[i], i );
   }
 
-  inline void operator*=( const InfinitePrecisionUInt& o )
+  inline void operator-=( const InfinitePrecisionUInt& o )
+  {
+    assert( *this > o );
+    for( uint32_t ip = o.m_values.size(); ip > 0; ip-- )
+    {
+      const uint32_t i = ip - 1;
+      uint32_t v = this->getOrCreate( i );
+      uint32_t vo = o.m_values[i];
+      if( v < vo )
+      {
+        bool found = false;
+        for( uint32_t j = i; !found && j < this->m_values.size()-1; j++ )
+        {
+          if( this->m_values[j+1] > 0 )
+          {
+            this->m_values[j+1]--;
+            for( uint32_t k = i + 1; k <= j; k++ )
+            {
+              assert( this->m_values[k] == 0 );
+              this->m_values[k] = InfinitePrecisionUInt::max() - 1;
+            }
+            this->m_values[i] += ( InfinitePrecisionUInt::max() - o.m_values[i] );
+            found = true;
+          }
+        }
+        assert( found == true );
+      }
+      else
+        this->m_values[i] -= o.m_values[i];
+    }
+  }
+
+  void operator*=( const InfinitePrecisionUInt& o )
   {
     InfinitePrecisionUInt dst;
     for( uint32_t i = 0; i < o.m_values.size(); i++ )
@@ -72,22 +104,28 @@ public:
       for( uint32_t j = 0; j < this->m_values.size(); j++ )
       {
         uint64_t m = uint64_t( o.m_values[i] ) * uint64_t( this->m_values[j] );
-        std::cout << o.m_values[i] << " * " << this->m_values[i] << " = " << m << std::endl;
+        //std::cout << o.m_values[i] << " * " << this->m_values[i] << " = " << m << std::endl;
         dst.addAt( m, i + j );
       }
     }
     ( *this ) = dst;
   }
 
-  inline bool operator==( const InfinitePrecisionUInt& o ) const
+  bool operator<( const InfinitePrecisionUInt& o ) const
   {
     if( m_values.size() != o.m_values.size() )
-      return false;
+      return m_values.size() < o.m_values.size();
+
     for( uint32_t i = 0; i < m_values.size(); i++ )
       if( m_values[i] != o.m_values[i] )
-        return false;
-    return true;
+        return m_values[i] < o.m_values[i];
+
+    return false;
   }
+
+  inline bool operator>( const InfinitePrecisionUInt& o ) const { return !(*this < o) && (*this != o); }
+  inline bool operator==( const InfinitePrecisionUInt& o ) const { return !( *this < o ) && !( o < *this ); }
+  inline bool operator!=( const InfinitePrecisionUInt& o ) const { return !( *this == o ); }
 
   std::ostream& print( std::ostream& s ) const
   {
@@ -101,13 +139,14 @@ public:
         std::stringstream ss; ss << ( max() + *it );
         s << ss.str().substr( 1 );
       }
-      s << '|';
+      //s << '|';
     }
     return s;
   }
 };
 
 inline InfinitePrecisionUInt operator+( const InfinitePrecisionUInt& a, const InfinitePrecisionUInt& b ) { InfinitePrecisionUInt dst = a; dst += b; return dst; }
+inline InfinitePrecisionUInt operator-( const InfinitePrecisionUInt& a, const InfinitePrecisionUInt& b ) { InfinitePrecisionUInt dst = a; dst -= b; return dst; }
 inline InfinitePrecisionUInt operator*( const InfinitePrecisionUInt& a, const InfinitePrecisionUInt& b ) { InfinitePrecisionUInt dst = a; dst *= b; return dst; }
 
 inline std::ostream& operator<<( std::ostream& s, const InfinitePrecisionUInt& f )
@@ -134,6 +173,17 @@ void Test()
 {
 
   {
+    UIntI a = "42424242424242";
+    UIntI b = "42424242424242";
+    UIntI c = "42425242424242";
+    UIntI d = "424242";
+    assert( a == b );
+    assert( !( a != b ) );
+    assert( a != c );
+    assert( a != d );
+  }
+
+  {
     UIntI a = 42;
     UIntI b = 7;
     UIntI c = 49;
@@ -141,8 +191,8 @@ void Test()
   }
 
   {
-    UIntI a = "9999999999999999999999999";
-    UIntI b = "2";
+    UIntI a =  "9999999999999999999999999";
+    UIntI b =                          "2";
     UIntI c = "10000000000000000000000001";
     assert( ( a + b ) == c );
   }
@@ -151,9 +201,28 @@ void Test()
     UIntI a = "5000000040";
     UIntI b = "4000000050";
     UIntI c = "20,000,000,410,000,002,000";
-    std::cout << c << std::endl;
-    std::cout << a * b << std::endl;
     assert( ( a * b ) == c );
+  }
+
+  {
+    UIntI a = "51515151";
+    UIntI b =  "5151515";
+    assert( b < a );
+    assert( !( a < b ) );
+  }
+
+  {
+    UIntI a = "5151515151515151515151515195151515151515151";
+    UIntI b = "5151515151515151515151515135151515151515151";
+    assert( b < a );
+    assert( !( a < b ) );
+  }
+
+  {
+    UIntI a = "10000000000000000000000001";
+    UIntI b =                          "2";
+    UIntI c =  "9999999999999999999999999";
+    assert( a - b == c );
   }
 
   std::cout << "Test passed" << std::endl;
